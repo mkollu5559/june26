@@ -1,5 +1,5 @@
 ---
-- name: Launch EC2
+- name: Launch EC2 using AWS CLI
   hosts: localhost
   connection: local
   gather_facts: false
@@ -12,26 +12,44 @@
           --image-id ami-07e7e31fc46b65840 \
           --instance-type t3.medium \
           --key-name CFS2-CFS1-jump-host-keypair-rsa \
-          --subnet-id subnet-0019d28e9299b3378 \
+          --subnet-id subnet-022ce59a121c563e9 \
           --security-group-ids \
             sg-0989bd70838ea322c \
             sg-0d917284feb1fedc1 \
             sg-082bdcd910313032d \
             sg-03af3773b72f69547 \
-            sg-06f4442b13cf0feefd \
+            sg-06f442b13cf0feefd \
           --iam-instance-profile Name=devops-nis-nonprod-ec2 \
-          --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":50,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
-          --metadata-options "HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2" \
-          --tag-specifications 'ResourceType=instance,Tags=[
-            {Key=Application_System_CI_Name,Value="NIS EFM NIT"},
-            {Key=CI_Environment,Value=Prod},
-            {Key=Line_Of_Business,Value="System IT Cloud"},
-            {Key=2nd_Level_Of_Support,Value="PT-NIS-EMIS"},
-            {Key=Information_Classification,Value="INTERNAL FR"},
-            {Key=Name,Value=bastion-host},
-            {Key=ManagedBy,Value=Ansible}
+          --block-device-mappings '[
+            {
+              "DeviceName":"/dev/xvda",
+              "Ebs":{
+                "VolumeSize":50,
+                "VolumeType":"gp3",
+                "DeleteOnTermination":true
+              }
+            }
+          ]' \
+          --metadata-options \
+            HttpEndpoint=enabled,\
+HttpTokens=required,\
+HttpPutResponseHopLimit=2 \
+          --tag-specifications '[
+            {
+              "ResourceType":"instance",
+              "Tags":[
+                {"Key":"Application_System_CI_Name","Value":"NIS EFM NIT"},
+                {"Key":"CI_Environment","Value":"Prod"},
+                {"Key":"Line_Of_Business","Value":"System IT Cloud"},
+                {"Key":"2nd_Level_Of_Support","Value":"PT-NIS-EMIS"},
+                {"Key":"Information_Classification","Value":"INTERNAL FR"},
+                {"Key":"Name","Value":"bastion-host"},
+                {"Key":"ManagedBy","Value":"Ansible"}
+              ]
+            }
           ]'
-      register: ec2
+      register: ec2_result
 
-    - debug:
-        var: ec2.stdout
+    - name: Show instance details
+      debug:
+        var: ec2_result.stdout
