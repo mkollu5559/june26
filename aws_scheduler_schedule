@@ -1,0 +1,42 @@
+resource "aws_scheduler_schedule" "daily_7am_est" {
+  name                         = "daily-7am-est"
+  schedule_expression          = "cron(0 7 * * ? *)"
+  schedule_expression_timezone = "America/New_York"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.example.arn
+    role_arn = aws_iam_role.scheduler_role.arn
+  }
+}
+
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowEventBridgeSchedulerAssumeRole",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "scheduler.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowInvokeLambda",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:<region>:<account-id>:function:<function-name>"
+    }
+  ]
+}
