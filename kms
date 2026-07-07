@@ -1,0 +1,77 @@
+{
+  "Version": "2012-10-17",
+  "Id": "key-policy-secrets-manager",
+  "Statement": [
+    {
+      "Sid": "EnableRootAccountAccess",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::ACCOUNT_ID:root" },
+      "Action": "kms:*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowKeyAdministration",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::ACCOUNT_ID:role/YourAdminRole" },
+      "Action": [
+        "kms:Create*", "kms:Describe*", "kms:Enable*", "kms:List*",
+        "kms:Put*", "kms:Update*", "kms:Revoke*", "kms:Disable*",
+        "kms:Get*", "kms:Delete*", "kms:TagResource", "kms:UntagResource",
+        "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowAppRolesToUseKey",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::ACCOUNT_ID:role/YourAppRole" },
+      "Action": [
+        "kms:Decrypt",
+        "kms:Encrypt",
+        "kms:GenerateDataKey",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowSecretsManagerToUseKeyViaGrant",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::ACCOUNT_ID:role/YourAppRole" },
+      "Action": "kms:CreateGrant",
+      "Resource": "*",
+      "Condition": {
+        "Bool": { "kms:GrantIsForAWSResource": "true" }
+      }
+    }
+  ]
+}
+
+
+
+role:
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SecretsManagerReadAccess",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret",
+"secretsmanager:CreateSecret",
+"secretsmanager:PutSecretValue",
+"secretsmanager:UpdateSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:your-ssh-key-secret-*"
+    },
+    {
+      "Sid": "KMSDecryptForSecret",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:DescribeKey"
+      ],
+      "Resource": "arn:aws:kms:REGION:ACCOUNT_ID:key/YOUR_KEY_ID"
+    }
+  ]
+}
