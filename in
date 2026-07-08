@@ -1,0 +1,334 @@
+Cloud (AWS)
+
+"How would you set up a multi-account AWS environment for a company with compliance needs?"
+"You're seeing random 500s and 503s from the load balancer under load — how do you dig in?"
+"When do you actually need multi-region, versus just multi-AZ?"
+"VPC peering, Transit Gateway, PrivateLink — when do you use each?"
+
+Terraform
+5. "How do you manage Terraform state across a big team?"
+6. "How do you keep modules reusable without them turning into a mess?"
+7. "Your Terraform state drifted from real infrastructure — what do you do?"
+8. "How would you split up a giant Terraform state without breaking anything?"
+Scripting
+9. "Walk me through how you'd write a script to clean up unused EBS volumes safely."
+10. "How do you make Ansible playbooks safe to rerun without breaking things?"
+11. "Tell me about something you automated that saved real time — what could've gone wrong?"
+CI/CD
+12. "How would you design a CI/CD setup for microservices that deploy independently?"
+13. "How do you handle secrets in a pipeline?"
+14. "A pipeline only fails in prod-like environments — how do you chase that down?"
+Troubleshooting
+15. "Production's down and there's no clear error in the logs — what's your process?"
+16. "What's the hardest bug you've debugged that spanned network, OS, and app layers?"
+Want me to regenerate the .txt file with these shorter phrasings (keeping the "what a strong answer covers" notes underneath each)?
+
+
+
+
+
+
+
+
+
+Senior DevOps / Cloud Engineer — Interview Guide
+
+Target candidate: 5+ years experience. Cloud Infrastructure (AWS),
+Terraform, Automation & Scripting, DevOps/CI-CD, Troubleshooting.
+
+1. Cloud Infrastructure Engineering (AWS)
+
+Q: Design a multi-account AWS landing zone for a company with strict
+compliance requirements. How would you handle centralized logging,
+billing, and cross-account IAM roles?
+
+Strong answer covers:
+
+-   AWS Organizations with OUs separating prod/non-prod/security/sandbox
+    accounts
+
+-   A dedicated log-archive account receiving CloudTrail, VPC Flow Logs,
+    and Config data via S3 with cross-account bucket policies
+
+-   Consolidated billing through the management account, with cost
+    allocation tags enforced via SCPs
+
+-   Cross-account access via IAM roles (not long-lived keys), assumed
+    through STS with least-privilege policies and short session
+    durations
+
+-   Guardrails via Service Control Policies to prevent risky actions
+    (e.g., disabling CloudTrail) even by account admins
+
+Red flag: candidate suggests sharing IAM users/keys across accounts, or
+has no answer for centralized audit logging.
+
+Q: Walk through how you'd diagnose intermittent 5xx(500, 503) errors from an ALB
+that only happen under load.
+
+Look for a structured methodology:
+
+-   Check ALB target group health checks and deregistration/connection
+    draining settings — under load, unhealthy targets get pulled
+    mid-request
+
+-   Review target response time and 5xx metrics in CloudWatch,
+    correlated with request count spikes
+
+-   Check for connection/keep-alive mismatches between ALB idle timeout
+    and backend (e.g., Nginx/app server) keep-alive timeout — a classic
+    cause of 502s under load
+
+-   Look at ECS/EC2 autoscaling — is scale-out lagging behind demand,
+    causing CPU/connection saturation?
+
+-   Check for connection pool exhaustion on the app side (DB
+    connections, thread pools)
+
+Strong candidates immediately mention the ALB-vs-backend idle timeout
+mismatch as a common gotcha.
+
+Q: How do you architect for high availability across Availability Zone vs regions, and
+when is multi-region actually justified vs over-engineering?
+
+-   Multi-AZ handles most availability needs (data center failure,
+    power, networking) at low added complexity/cost
+
+-   Multi-region is justified for regulatory data residency, extremely
+    low RTO/RPO requirements, or serving globally distributed users with
+    latency SLAs
+
+-   Multi-region adds real cost: data replication lag, split-brain risk,
+    more complex deployment and testing, doubled operational overhead
+
+Look for a candidate who pushes back on multi-region as a default rather
+than assuming it's always 'more resilient = better'.
+
+Q: Explain VPC peering vs Transit Gateway vs PrivateLink — when would
+you use each?
+
+-   VPC Peering: simple 1:1 connections, no transitive routing, fine for
+    a small number of VPCs
+
+-   Transit Gateway: hub-and-spoke model for many VPCs/accounts/on-prem
+    connections, supports transitive routing, centralized route
+    management — the right call as VPC count grows
+
+-   PrivateLink: exposes a specific service privately (e.g., a SaaS
+    product or internal microservice) without exposing the whole VPC,
+    avoids IP overlap issues entirely
+
+Watch for candidates who default to Transit Gateway even for 2-3 VPCs
+(unnecessary cost/complexity) or who don't know PrivateLink solves IP
+overlap problems that peering can't.
+
+2. Infrastructure as Code (Terraform)
+
+Q: How do you manage Terraform state for a team of 20+ engineers working
+across multiple environments?
+
+-   Remote backend (S3 + DynamoDB for locking, or Terraform Cloud) —
+    never local state for a team
+
+-   State locking to prevent concurrent applies corrupting state
+
+-   Separate state files per environment (and often per logical
+    component) to limit blast radius — not one giant monolithic state
+
+-   Workspaces can work for small variations but many teams prefer
+    directory-per-environment for clarity and to avoid workspace
+    footguns
+
+-   Strict code review + plan output review before apply, ideally via
+    CI/CD rather than local applies
+
+Q: Describe how you'd structure reusable modules to avoid duplication
+without over-abstracting.
+
+-   Modules should represent a coherent unit of infrastructure (e.g.,
+    'VPC', 'EKS cluster') with sensible, minimal required inputs and
+    safe defaults
+
+-   Avoid 'god modules' that try to handle every possible configuration
+    via dozens of optional variables — this becomes unreadable
+
+-   Version modules (via git tags or a registry) so environments can pin
+    versions and upgrade deliberately
+
+-   Good candidates mention the tradeoff: too little abstraction =
+    copy-paste drift; too much = an unmaintainable framework nobody
+    understands
+
+Q: How do you handle a situation where Terraform state has drifted from
+actual infrastructure?
+
+-   Run terraform plan regularly (or in CI on a schedule) to detect
+    drift proactively rather than discovering it during an incident
+
+-   Use terraform state show / refresh to understand what changed and
+    why (manual console change? another pipeline?)
+
+-   For legitimate out-of-band changes, reconcile via terraform import
+    or by updating config to match reality — never blindly apply to
+    force revert without understanding why drift happened
+
+-   Root-cause the drift: usually points to a process gap (someone with
+    console access bypassing IaC) worth fixing
+
+Q: How would you safely refactor a large, monolithic Terraform state
+(splitting it) without downtime?
+
+-   Use terraform state mv (or moved blocks in newer Terraform) to
+    relocate resources between state files without destroying/recreating
+    them
+
+-   Do it incrementally, verifying plan shows zero changes (no diff)
+    after each move
+
+-   Take a state backup before any state surgery
+
+-   Coordinate with the team to avoid concurrent applies during the
+    migration window
+
+Red flag: any answer that involves destroying and recreating live
+infrastructure to 'start clean'.
+
+3. Automation & Scripting
+
+Q: Write pseudocode/code for a script that cleans up orphaned EBS
+volumes safely and idempotently.
+
+Look for these characteristics regardless of language:
+
+-   Query volumes with state 'available' (unattached) via the AWS
+    SDK/CLI
+
+-   Filter by age (e.g., unattached > 14 days) and tags (skip anything
+    tagged 'keep' or without an owner tag — flag for review instead of
+    auto-deleting)
+
+-   Dry-run mode by default; require an explicit flag to actually delete
+
+-   Idempotency: re-running the script on the same volumes shouldn't
+    error or double-charge/double-act
+
+-   Logging of every action taken, ideally to a place that's auditable
+
+Red flag: a script that deletes immediately with no dry-run, age check,
+or tag-based safety net.
+
+Q: How do you approach error handling and idempotency in Ansible
+playbooks for production systems?
+
+-   Use built-in idempotent modules (package, service, file, etc.)
+    rather than raw shell/command tasks wherever possible
+
+-   When shell/command is unavoidable, use creates/, changed_when, and
+    check mode to make it idempotent and accurately reported
+
+-   Use block/rescue for structured error handling and cleanup
+
+-   Test with --check and --diff before running against production
+
+-   Use tags and limit to scope blast radius when running against
+    production
+
+Q: Describe a time you automated something that saved significant manual
+toil — what was the ROI and what could've gone wrong?
+
+This is behavioral — listen for:
+
+-   A concrete before/after (e.g., 'manual deploy took 2 hours and was
+    error-prone, automated pipeline takes 10 minutes')
+
+-   Awareness of failure modes they had to guard against (partial
+    failures, race conditions, permissions)
+
+-   Whether they measured/quantified the impact, not just a vague 'it
+    helped'
+
+4. DevOps & CI/CD
+
+Q: Design a CI/CD pipeline for microservices with independent deploy
+cadences. How do you handle rollback and canary deployments?
+
+-   Each service has its own pipeline/versioning, not a shared
+    monolithic pipeline that couples unrelated deploys
+
+-   Canary: route a small % of traffic to the new version, monitor key
+    metrics (error rate, latency) automatically, and promote or abort
+    based on thresholds
+
+-   Rollback: keep the previous version's artifact/image readily
+    deployable; prefer 'redeploy last known good' over 'git revert and
+    rebuild' for speed during an incident
+
+-   Feature flags to decouple deployment from release for riskier
+    changes
+
+Q: How do you secure secrets in a CI/CD pipeline (build-time vs
+runtime)?
+
+-   Never hardcode secrets in pipeline config or bake them into images
+
+-   Use a secrets manager (AWS Secrets Manager, Vault) with the pipeline
+    assuming a scoped IAM role/short-lived token to fetch secrets at
+    runtime
+
+-   Build-time secrets (e.g., private package registry tokens) should be
+    injected via masked CI variables, never logged, and rotated
+    regularly
+
+-   Scan for accidentally committed secrets (e.g., gitleaks/trufflehog)
+    as a pipeline gate
+
+Q: What's your strategy for pipeline failures that only reproduce in
+production-like environments?
+
+-   Maintain a staging environment that mirrors production as closely as
+    practical (data volume, config, network topology)
+
+-   Add better observability into the pipeline itself (structured logs,
+    timing per stage) rather than guessing
+
+-   Consider environment-specific config drift as a top suspect — diff
+    staging vs prod config/infra first
+
+5. Troubleshooting & Problem Solving
+
+Q: Walk me through your methodology for troubleshooting a production
+outage with no clear error logs.
+
+Look for a structured approach, e.g.:
+
+-   Establish blast radius and impact first (who/what is affected)
+    before deep-diving
+
+-   Check recent changes first (deploys, config changes, infra changes)
+    — most outages correlate with a recent change
+
+-   Work top-down through the stack: DNS/network reachability, then
+    infra health, then application, then dependencies
+
+-   Use metrics/dashboards to narrow the time window and correlate with
+    the change history
+
+-   Communicate status/ETA to stakeholders throughout, not just
+    heads-down debugging in silence
+
+Q: Describe the hardest cross-stack issue you've debugged (spanning
+networking, OS, and application layers).
+
+Behavioral — listen for:
+
+-   A clear narrative of hypothesis -> test -> narrow down, rather than
+    random flailing
+
+-   Willingness to say what they got wrong along the way
+
+-   Follow-up: did they add monitoring/alerting or documentation
+    afterward to prevent recurrence?
+
+Note: answers above describe what a strong response covers, not verbatim
+scripts to read aloud. Adjust follow-up probes based on how the
+candidate's actual AWS/Terraform experience maps to your stack.
