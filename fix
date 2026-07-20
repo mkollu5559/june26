@@ -1,0 +1,32 @@
+#!/bin/bash
+# Run as root
+
+echo "=== 6.1.11: Remediating world-writable files ==="
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type f -perm -0002 -exec chmod o-w {} +
+
+echo "=== 6.1.12: Remediating unowned files/directories ==="
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -nouser -exec chown root:root {} +
+
+echo "=== 6.1.13: Remediating ungrouped files/directories ==="
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -nogroup -exec chown root:root {} +
+
+echo "=== 6.1.2: Setting sticky bit on world-writable directories ==="
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 -exec chmod a+t {} +
+
+echo ""
+echo "=== VALIDATION ==="
+
+echo "--- 6.1.11: World-writable files (should be empty) ---"
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type f -perm -0002
+
+echo "--- 6.1.12: Unowned files/directories (should be empty) ---"
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -nouser
+
+echo "--- 6.1.13: Ungrouped files/directories (should be empty) ---"
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -nogroup
+
+echo "--- 6.1.2: World-writable dirs without sticky bit (should be empty) ---"
+df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 ! -perm -1000
+
+echo ""
+echo "=== DONE ==="
